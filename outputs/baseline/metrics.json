@@ -1,0 +1,9 @@
+{
+  "count": 12,
+  "exact_count": 5,
+  "exact_match": 0.4166666666666667,
+  "total_distance": 19,
+  "total_reference_length": 105,
+  "cer": 0.18095238095238095,
+  "mean_cer": 0.16954966329966328
+}
