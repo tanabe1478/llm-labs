@@ -107,13 +107,13 @@ actual:   自身に備える
 
 ```json
 {
-  "count": 12,
-  "exact_count": 5,
-  "exact_match": 0.4166666666666667,
-  "total_distance": 19,
-  "total_reference_length": 105,
-  "cer": 0.18095238095238095,
-  "mean_cer": 0.16954966329966328
+  "count": 36,
+  "exact_count": 25,
+  "exact_match": 0.6944444444444444,
+  "total_distance": 27,
+  "total_reference_length": 291,
+  "cer": 0.09278350515463918,
+  "mean_cer": 0.09156946448613117
 }
 ```
 
@@ -123,15 +123,15 @@ actual:   自身に備える
 
 ## 見方
 
-今回の baseline は以下。
+Phase 4.5 でデータを拡張した後の baseline は以下。
 
 ```text
-Exact Match: 5/12 = 0.4167
-CER: 0.1810
+Exact Match: 25/36 = 0.6944
+CER: 0.0927
 ```
 
-つまり、12件中5件は完全一致。  
-完全一致しなかった7件も、どのくらい文字単位でズレているかを CER で見られる。
+つまり、36件中25件は完全一致。  
+完全一致しなかった11件も、どのくらい文字単位でズレているかを CER で見られる。
 
 特に悪かった例:
 

@@ -1,6 +1,6 @@
 # Mini Dataset 作成メモ
 
-Phase 3 として、fine-tuning 用の小さな `train.jsonl` / `eval.jsonl` を作成した。
+Phase 3 で小さな dataset を作成し、Phase 4.5 で fine-tuning 前に拡張した。
 
 目的は、最初から大規模データを作ることではなく、以下を学ぶこと。
 
@@ -22,12 +22,12 @@ outputs/baseline/eval_predictions.jsonl
 ### `data/train.jsonl`
 
 fine-tuning でモデルに見せる予定のデータ。  
-20件。
+Phase 4.5 時点で 65件。
 
 ### `data/eval.jsonl`
 
 fine-tuning 後の評価に使う予定のデータ。  
-12件。
+Phase 4.5 時点で 36件。
 
 重要: `eval.jsonl` は学習時にはモデルへ見せない。  
 見せてしまうと、モデルが本当に汎化したのか、単に暗記したのか分からなくなる。
@@ -39,7 +39,7 @@ fine-tuning 後の評価に使う予定のデータ。
 各行は JSON。
 
 ```jsonl
-{"input":"あのはしをわたる","output":"あの橋を渡る","note":"trainとは別文の はし=橋"}
+{"input":"あのはしをわたる","output":"あの橋を渡る","note":"はし=橋"}
 ```
 
 | key | 意味 |
@@ -63,10 +63,15 @@ fine-tuning 後の評価に使う予定のデータ。
 |---|---|
 | はし | 橋 / 箸 / 端 |
 | しじ | 指示 / 支持 |
-| しかい | 歯科医 / 司会 |
-| あつい | 厚い / 熱い / 篤い |
-| かみ | 髪 / 紙 |
+| しかい | 歯科医 / 司会 / 視界 |
+| あつい | 厚い / 熱い / 暑い / 篤い |
+| かみ | 髪 / 紙 / 神 |
 | じしん | 自身 / 自信 / 地震 |
+| こうしょう | 交渉 / 校章 / 考証 / 高尚 |
+| せいさく | 政策 / 制作 |
+| きる | 着る / 切る |
+| あう | 会う / 合う |
+| かえる | 帰る / 変える / 蛙 |
 
 これは、単純な辞書置換ではなく、周囲の文脈を見ないと正解を選びにくいケース。
 
@@ -95,6 +100,34 @@ eval:
 
 ---
 
+## dataset validation
+
+`scripts/validate_dataset.py` で最低限の検査を行う。
+
+```bash
+python3 scripts/validate_dataset.py
+```
+
+確認すること:
+
+- `input` / `output` が存在する
+- `input` / `output` が空でない
+- train 内で重複がない
+- eval 内で重複がない
+- train と eval で同じ `input` が重複していない
+
+Phase 4.5 時点の結果:
+
+```text
+train_count: 65
+eval_count: 36
+train_note_kinds: 53
+eval_note_kinds: 31
+dataset validation: OK
+```
+
+---
+
 ## baseline を eval にかけた結果
 
 以下を実行した。
@@ -104,24 +137,20 @@ python3 scripts/run_baseline.py \
   --input data/eval.jsonl \
   --output outputs/baseline/eval_predictions.jsonl \
   --device auto
+
+python3 scripts/evaluate.py \
+  --references data/eval.jsonl \
+  --predictions outputs/baseline/eval_predictions.jsonl \
+  --metrics-output outputs/baseline/metrics.json \
+  --errors-output outputs/baseline/errors.md
 ```
 
-結果の抜粋:
+Phase 4.5 時点の baseline:
 
-| input | expected | baseline prediction | 観察 |
-|---|---|---|---|
-| あのはしをわたる | あの橋を渡る | あの橋を渡る | 正解 |
-| そのはしでさかなをたべる | その箸で魚を食べる | その箸で魚を食べる | 正解 |
-| みちのはしをあるく | 道の端を歩く | 道の橋を歩く | `端` ではなく `橋` |
-| しじをよくよんでからはじめる | 指示をよく読んでから始める | 指示をよく読んでから始める | 正解 |
-| わたしはそのせいさくをしじする | 私はその政策を支持する | 私はその制作を支持する | `政策` が `制作` |
-| はがいたむのでしかいへいく | 歯が痛むので歯科医へ行く | 羽賀板武の弟子海兵区 | 大きく崩れた |
-| こんかいのしかいはたなかさんです | 今回の司会は田中さんです | 今回の司会は田中さんです | 正解 |
-| あついなべにさわらない | 熱い鍋に触らない | 暑い鍋に触らない | `熱い` ではなく `暑い` |
-| あついしりょうをもらった | 厚い資料をもらった | 熱い資料をもらった | `厚い` ではなく `熱い` |
-| じしんをもってはなす | 自信を持って話す | 自信を持って話す | 正解 |
-| じしんにそなえる | 地震に備える | 自身に備える | `地震` ではなく `自身` |
-| かみをとかす | 髪をとかす | 髪を溶かす | `とかす` の漢字が違う |
+```text
+Exact Match: 25/36 = 0.6944
+CER: 0.0927
+```
 
 ---
 
@@ -129,24 +158,35 @@ python3 scripts/run_baseline.py \
 
 ### 1. zenz-v1 は簡単な文脈ならかなり強い
 
-`あのはしをわたる` や `そのはしでさかなをたべる` は正しく変換できた。
+`はし=橋`、`はし=箸`、`しじ=指示/支持`、`しかい=司会/視界` などは多く正解できた。
 
-### 2. 似た読みが多いと大きく崩れることがある
+### 2. まだ苦手なケースが残っている
 
-特に以下は大きく崩れた。
+代表例:
 
 ```text
 はがいたむのでしかいへいく
 → 羽賀板武の弟子海兵区
 ```
 
-`はがいたむ` / `しかい` のように、短い同音異義語が連続すると不安定になる可能性がある。
+```text
+ほんだなのはしをふく
+→ 本棚の橋を含む
+```
+
+```text
+じしんにそなえる
+→ 自身に備える
+```
+
+```text
+あついしりょうをもらった
+→ 熱い資料をもらった
+```
 
 ### 3. fine-tuning 題材としては良い
 
-今回の eval には、すでに正解できる例と間違える例が混ざっている。
-
-これは良い状態。
+拡張後の eval は、正解できる例と間違える例が混ざっている。
 
 - 全部正解: fine-tuning の効果が見えにくい
 - 全部不正解: データやモデル設定が難しすぎる
@@ -156,13 +196,11 @@ python3 scripts/run_baseline.py \
 
 ## 次のステップ
 
-次は Phase 4 として、評価スクリプトを作る。
+次は Phase 5 として、`scripts/finetune.py` を作る。
 
-最低限ほしい指標:
+重要になる処理:
 
-1. Exact Match
-   - prediction が output と完全一致したか
-2. CER
-   - 文字単位でどれくらい違うか
-
-今は目視で比較しているが、次は `scripts/evaluate.py` で数値化する。
+- `input` をカタカナ化して prompt を作る
+- `output` を prompt の後ろにつなげる
+- 入力部分の label を `-100` にして loss 対象から外す
+- 少量データなので過学習に注意する
